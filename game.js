@@ -103,9 +103,11 @@ function update() {
     this.player.anims.play('jump', true);
   } else if (this.cursors.left.isDown || this.cursors.right.isDown) {
     this.player.anims.play('walk', true);
+  } else {
+    this.player.anims.play('idle', true)
   }
 
   if (this.cursors.up.isDown && onGround) {
-    this.player.setVelocityY(-400);
+    this.player.setVelocityY(-335);
   }
 }
