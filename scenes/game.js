@@ -231,14 +231,14 @@ class GameScene extends Phaser.Scene {
     // Update Health Bar UI
   updateHealthBar() {
     this.healthBar.clear()
-    this.healthBar.fillStyle(0xff0000, 1)
+    this.healthBar.fillStyle(0xD84040, 1)
     this.healthBar.fillRect(40, 15, (this.health / this.maxHealth) * 100, 15)
     }
 
     // Update Mana Bar UI
   updateManaBar() {
     this.manaBar.clear()
-    this.manaBar.fillStyle(0x0000ff, 1)
+    this.manaBar.fillStyle(0x3674B5, 1)
     this.manaBar.fillRect(40, 39, (this.mana / this.maxMana) * 100, 15) // Scales the bar
   }
 }
