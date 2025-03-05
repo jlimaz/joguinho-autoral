@@ -6,6 +6,11 @@ class GameScene extends Phaser.Scene {
     this.jumpBufferTime = 150 // milliseconds
     this.lastGroundedTime = 0
     this.lastJumpPressTime = 0
+
+    this.maxMana = 200 // 🔥 Maximum mana
+    this.mana = this.maxMana // 🔥 Start at full mana
+    this.manaRegenRate = 10 // 🔥 Mana regenerated per second
+    this.manaCost = 20 // 🔥 Mana cost per spell
   }
 
   preload() {
@@ -18,6 +23,7 @@ class GameScene extends Phaser.Scene {
 
     this.load.image('menuButton', 'assets/menu.png')
     this.load.image('firstWave', 'assets/firstWave.png')
+    this.load.image('hudTopLeft', 'assets/hudTopLeft.png')
 
     let mistGfx = this.make.graphics({ x: 0, y: 0, add: false })
     mistGfx.fillStyle(0xffffff, 0.2)
@@ -31,7 +37,26 @@ class GameScene extends Phaser.Scene {
     this.background2 = this.add.tileSprite(0, 0, widthGame, heightGame, 'background2').setOrigin(0, 0);
     this.add.image(widthGame / 2, heightGame / 2, 'backgroundIG')
 
-    this.add.image(widthGame - 75, 75, 'menuButton').setScale(0.35)
+    this.add.image(310, 110, 'hudTopLeft').setScale(0.2)
+
+    this.add.image(widthGame - 75, 75, 'menuButton').setScale(0.3)
+
+    // 🔥 health bar
+    this.healthBar = this.add.rectangle(388, 72.5, 356, 40, 0xD84040)
+
+    // 🔥 mana bar
+    this.manaBar = this.add.rectangle(388, 148.5, 356, 40, 0x578FCA)
+
+    // 🔥 Mana Regeneration System (Runs Every Second)
+    this.time.addEvent({
+      delay: 1000,
+      callback: this.regenerateMana,
+      callbackScope: this,
+      loop: true
+    })
+
+    
+    
     // Add image with delay and fade in/out
     this.time.delayedCall(2000, () => {
       let image = this.add.image(widthGame / 2, 75, 'firstWave').setAlpha(0);
@@ -65,6 +90,11 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.ground)
     this.cursors = this.input.keyboard.createCursorKeys()
     this.shootKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K) // Add shoot key
+
+    // Add A and D keys
+    this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A)
+    this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
+    this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
 
     this.anims.create({
       key: 'idle',
@@ -175,12 +205,27 @@ class GameScene extends Phaser.Scene {
     enemy.destroy()
   }
 
+  regenerateMana() {
+    this.mana = Math.min(this.mana + this.manaRegenRate, this.maxMana)
+    this.updateManaBar()
+  }
+
   shootSpell() {
+
+    if (this.mana < this.manaCost) {
+      console.log('Not enough mana!')
+      return
+    }
+
     let spell = this.spells.create(this.player.x, this.player.y - 10, 'spell').setScale(0.10)
     
     spell.anims.play('spell_fly', true)
+
+    this.mana -= this.manaCost // 🔥 Deduct Mana
+    this.updateManaBar() // 🔥 Update the mana bar
   
     let direction = this.player.flipX ? -1 : 1
+    spell.body.setSize(815, 415)
     spell.setVelocityX(400 * direction)
     spell.setFlipX(this.player.flipX)
     
@@ -200,6 +245,18 @@ class GameScene extends Phaser.Scene {
       this.isShooting = false
     })
   }
+
+  updateManaBar() {
+    let newWidth = (this.mana / this.maxMana) * 356
+  
+    this.tweens.add({
+      targets: this.manaBar,
+      width: Math.max(newWidth, 0), // Prevent negative width
+      duration: 250, 
+      ease: 'Linear' // Smooth linear transition
+    })
+  }
+  
   
 
   handlePlayerOverlap(player, enemy) {
@@ -214,10 +271,9 @@ class GameScene extends Phaser.Scene {
       this.lastGroundedTime = time
     }
   
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+    if (Phaser.Input.Keyboard.JustDown(this.keySpace)) {
       this.lastJumpPressTime = time
     }
-  
     const withinCoyoteTime = time - this.lastGroundedTime < this.coyoteTime
     const withinJumpBuffer = time - this.lastJumpPressTime < this.jumpBufferTime
   
@@ -234,13 +290,13 @@ class GameScene extends Phaser.Scene {
     }
   
     // ✅ Allow movement while shooting, but don't override the shoot animation
-    if (this.cursors.left.isDown) {
+    if (this.keyA.isDown) {
       this.player.setVelocityX(-220)
       if (!this.isShooting && this.player.body.blocked.down) {
         this.player.anims.play('run', true)
       }
       this.player.setFlipX(true)
-    } else if (this.cursors.right.isDown) {
+    } else if (this.keyD.isDown) {
       this.player.setVelocityX(220)
       if (!this.isShooting && this.player.body.blocked.down) {
         this.player.anims.play('run', true)
