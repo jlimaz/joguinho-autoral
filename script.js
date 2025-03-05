@@ -1,16 +1,16 @@
-const widthGame = 620
-const heightGame = 360
+const widthGame = 1920
+const heightGame = 1080
 
 // configurações iniciais do phaser como resolução, gravidade, cenas, etc
 const config = {
   type: Phaser.AUTO,
-  width: 620,
-  height: 360,
+  width: widthGame,
+  height: heightGame,
   physics: {
     default: 'arcade',
     arcade: {
-      gravity: { x: 0, y: 850 }, // isso aqui define a gravidade no eixo y
-      debug: false // isso aqui mostra a caixinha de colisão dos objetos
+      gravity: { x: 0, y: 800 }, // isso aqui define a gravidade no eixo y
+      debug: true // isso aqui mostra a caixinha de colisão dos objetos
     }
   },
   // isso adiciona as cenas que serão usadas

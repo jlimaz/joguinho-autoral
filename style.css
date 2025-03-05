@@ -10,7 +10,6 @@ body {
   
 canvas {
   display: block;
-  width: 75vw; /* Set width to 80% of the viewport width */
-  height: auto; /* Automatically adjust height to maintain aspect ratio */
-  image-rendering: pixelated; /* Keeps pixel art crisp */
+  height: 100vh;
+  width: auto;
 }
