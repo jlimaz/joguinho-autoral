@@ -1,7 +1,7 @@
 class GameScene extends Phaser.Scene {
   constructor() {
     super({ key: 'GameScene' })
-  
+
     this.coyoteTime = 100 // milliseconds
     this.jumpBufferTime = 150 // milliseconds
     this.lastGroundedTime = 0
@@ -66,36 +66,83 @@ class GameScene extends Phaser.Scene {
       scale: { start: 1, end: 2 },
       blendMode: 'ADD'
     })
+
+    // 🔴 Enemy Group
+    this.enemies = this.physics.add.group()
+
+    // Enemies collide with the ground
+    this.physics.add.collider(this.enemies, this.ground)
+
+    // Overlap instead of collision (triggers event when touching)
+    this.physics.add.overlap(this.player, this.enemies, this.handlePlayerOverlap, null, this)
+
+    // Enemy Spawning
+    this.time.addEvent({
+      delay: 2000, // Spawn every 2 seconds
+      callback: this.spawnEnemy,
+      callbackScope: this,
+      loop: true
+    })
+  }
+
+  spawnEnemy() {
+    let x = Phaser.Math.Between(50, widthGame - 50) // Random X position
+    let y = Phaser.Math.Between(50, heightGame / 2) // Random Y position (above ground)
+
+    let enemy = this.enemies.create(x, y, 'player').setScale(0.2) // Reusing player sprite for now
+    enemy.body.setSize(340, 600)
+    enemy.setCollideWorldBounds(true)
+    enemy.setTint(0xff0000) // Make it visually distinct
+
+    // Give it an initial velocity toward the player
+    this.setEnemyMovement(enemy)
+  }
+
+  setEnemyMovement(enemy) {
+    this.time.addEvent({
+      delay: 100, // Update movement every 100ms
+      callback: () => {
+        if (!enemy.active) return
+
+        let directionX = this.player.x - enemy.x
+        let directionY = this.player.y - enemy.y
+
+        let speed = 100 // Adjust speed as needed
+
+        let angle = Math.atan2(directionY, directionX)
+        enemy.setVelocityX(Math.cos(angle) * speed)
+        enemy.setVelocityY(Math.sin(angle) * speed)
+      },
+      loop: true
+    })
+  }
+
+  handlePlayerOverlap(player, enemy) {
+    console.log('⚠ Player touched an enemy!') // Replace with damage or game over logic
+    enemy.destroy() // Remove enemy on contact (optional)
   }
 
   update(time, delta) {
-
     const isGrounded = this.player.body.blocked.down
 
-    // Track when the player was last grounded
     if (isGrounded) {
       this.lastGroundedTime = time
     }
 
-    // Track when the player last tried to jump
     if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
       this.lastJumpPressTime = time
     }
 
-    // Allow jumping if within coyote time or jump buffer window
     const withinCoyoteTime = time - this.lastGroundedTime < this.coyoteTime
     const withinJumpBuffer = time - this.lastJumpPressTime < this.jumpBufferTime
 
     if (withinCoyoteTime && withinJumpBuffer) {
       this.player.setVelocityY(-350)
       this.player.anims.play('jump', true)
-
-      // Reset the timers to prevent double jumping
       this.lastGroundedTime = 0
       this.lastJumpPressTime = 0
     }
 
-    // Movement controls
     if (this.cursors.left.isDown) {
       this.player.setVelocityX(-220)
       this.player.anims.play('run', true)
