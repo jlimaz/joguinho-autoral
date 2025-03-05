@@ -10,8 +10,13 @@ class GameScene extends Phaser.Scene {
 
   preload() {
     this.load.spritesheet('player', 'assets/playerSheet.png', { frameWidth: 900, frameHeight: 900 })
+    this.load.spritesheet('skeleton', 'assets/skeleton.png', { frameWidth: 900, frameHeight: 900 })
+    this.load.spritesheet('spell', 'assets/spell.png', { frameWidth: 1800, frameHeight: 1200 }) // Load spell
     this.load.image('bgF', 'assets/backgroundIG.png')
     this.load.image('ground', 'assets/ground.png')
+
+    this.load.image('menuButton', 'assets/menu.png')
+    this.load.image('firstWave', 'assets/firstWave.png')
 
     let mistGfx = this.make.graphics({ x: 0, y: 0, add: false })
     mistGfx.fillStyle(0xffffff, 0.2)
@@ -22,19 +27,43 @@ class GameScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.fadeIn(225, 0, 0, 0)
-
     this.add.image(widthGame / 2, heightGame / 2, 'bgF')
-    this.player = this.physics.add.sprite(100, 500, 'player').setScale(0.2)
+
+    this.add.image(widthGame - 75, 75, 'menuButton').setScale(0.35)
+    // Add image with delay and fade in/out
+    this.time.delayedCall(2000, () => {
+      let image = this.add.image(widthGame / 2, 75, 'firstWave').setAlpha(0);
+      this.tweens.add({
+      targets: image,
+      alpha: 1,
+      duration: 1000,
+      onComplete: () => {
+        this.time.delayedCall(3000, () => {
+        this.tweens.add({
+          targets: image,
+          alpha: 0,
+          duration: 1000,
+          onComplete: () => {
+          image.destroy();
+          }
+        });
+        });
+      }
+      });
+    });
+
+    this.player = this.physics.add.sprite(100, heightGame - 200, 'player').setScale(0.2)
     this.player.body.setSize(340, 600)
     this.player.setCollideWorldBounds(true)
 
     this.ground = this.physics.add.staticGroup()
-    this.ground.create(widthGame / 2, heightGame - 50, 'ground').refreshBody()
+    let groundTile = this.ground.create(widthGame / 2, heightGame - 50, 'ground')
+    groundTile.refreshBody()
+
     this.physics.add.collider(this.player, this.ground)
-
     this.cursors = this.input.keyboard.createCursorKeys()
+    this.shootKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K) // Add shoot key
 
-    // Define animations
     this.anims.create({
       key: 'idle',
       frames: this.anims.generateFrameNumbers('player', { start: 0, end: 17 }),
@@ -45,7 +74,7 @@ class GameScene extends Phaser.Scene {
     this.anims.create({
       key: 'run',
       frames: this.anims.generateFrameNumbers('player', { start: 20, end: 31 }),
-      frameRate: 12,
+      frameRate: 14,
       repeat: -1
     })
 
@@ -56,9 +85,30 @@ class GameScene extends Phaser.Scene {
       repeat: -1
     })
 
+    this.anims.create({
+      key: 'shoot',
+      frames: this.anims.generateFrameNumbers('player', { start: 35, end: 46 }),
+      frameRate: 24,
+      repeat: 0
+    })
+
+    this.anims.create({
+      key: 'skeleton_run',
+      frames: this.anims.generateFrameNumbers('skeleton', { start: 0, end: 11 }),
+      frameRate: 12,
+      repeat: -1
+    })
+
+    this.anims.create({
+      key: 'spell_fly',
+      frames: this.anims.generateFrameNumbers('spell', { start: 0, end: 3 }), // Assuming 4 frames for the spell
+      frameRate: 10,
+      repeat: -1
+    })
+
     this.mistParticles = this.add.particles(0, 0, 'mistParticle', {
       x: { min: 0, max: widthGame },
-      y: { min: 0, max: heightGame - 110},
+      y: { min: 0, max: heightGame - 110 },
       lifespan: 3000,
       speedX: { min: -10, max: 10 },
       speedY: { min: -3, max: -8 },
@@ -67,93 +117,142 @@ class GameScene extends Phaser.Scene {
       blendMode: 'ADD'
     })
 
-    // 🔴 Enemy Group
     this.enemies = this.physics.add.group()
-
-    // Enemies collide with the ground
     this.physics.add.collider(this.enemies, this.ground)
-
-    // Overlap instead of collision (triggers event when touching)
     this.physics.add.overlap(this.player, this.enemies, this.handlePlayerOverlap, null, this)
 
-    // Enemy Spawning
     this.time.addEvent({
-      delay: 2000, // Spawn every 2 seconds
+      delay: 2000,
       callback: this.spawnEnemy,
       callbackScope: this,
       loop: true
     })
+
+    // 🔥 Spell group
+    this.spells = this.physics.add.group()
+
+    // Collision: Spell hits enemy
+    this.physics.add.overlap(this.spells, this.enemies, this.spellHitEnemy, null, this)
   }
 
   spawnEnemy() {
-    let x = Phaser.Math.Between(50, widthGame - 50) // Random X position
-    let y = Phaser.Math.Between(50, heightGame / 2) // Random Y position (above ground)
+    let spawnX = Phaser.Math.Between(50, widthGame - 50)
+    let spawnY = heightGame - 165
 
-    let enemy = this.enemies.create(x, y, 'player').setScale(0.2) // Reusing player sprite for now
+    let enemy = this.enemies.create(spawnX, spawnY, 'skeleton').setScale(0.2)
     enemy.body.setSize(340, 600)
     enemy.setCollideWorldBounds(true)
-    enemy.setTint(0xff0000) // Make it visually distinct
+    enemy.anims.play('skeleton_run', true)
 
-    // Give it an initial velocity toward the player
     this.setEnemyMovement(enemy)
   }
 
   setEnemyMovement(enemy) {
     this.time.addEvent({
-      delay: 100, // Update movement every 100ms
+      delay: 100,
       callback: () => {
         if (!enemy.active) return
 
         let directionX = this.player.x - enemy.x
-        let directionY = this.player.y - enemy.y
+        let speed = 100
 
-        let speed = 100 // Adjust speed as needed
-
-        let angle = Math.atan2(directionY, directionX)
-        enemy.setVelocityX(Math.cos(angle) * speed)
-        enemy.setVelocityY(Math.sin(angle) * speed)
+        if (directionX > 0) {
+          enemy.setVelocityX(speed)
+          enemy.setFlipX(false)
+        } else {
+          enemy.setVelocityX(-speed)
+          enemy.setFlipX(true)
+        }
       },
       loop: true
     })
   }
 
+  spellHitEnemy(spell, enemy) {
+    spell.destroy()
+    enemy.destroy()
+  }
+
+  shootSpell() {
+    let spell = this.spells.create(this.player.x, this.player.y - 10, 'spell').setScale(0.10)
+    
+    spell.anims.play('spell_fly', true)
+  
+    let direction = this.player.flipX ? -1 : 1
+    spell.setVelocityX(400 * direction)
+    spell.setFlipX(this.player.flipX)
+    
+    spell.body.allowGravity = false // ✅ Disable gravity so it moves straight
+    
+    // Destroy spell after leaving screen
+    this.time.delayedCall(2000, () => spell.destroy())
+  
+    // 🔥 Play shoot animation **without stopping movement**
+    this.player.anims.play('shoot', true)
+  
+    // ✅ Set a flag so update() knows the shoot animation is playing
+    this.isShooting = true 
+  
+    // ⏳ Once the animation ends, reset the flag
+    this.player.once('animationcomplete-shoot', () => {
+      this.isShooting = false
+    })
+  }
+  
+
   handlePlayerOverlap(player, enemy) {
-    console.log('⚠ Player touched an enemy!') // Replace with damage or game over logic
-    enemy.destroy() // Remove enemy on contact (optional)
+    console.log('⚠ Player touched an enemy!')
+    enemy.destroy()
   }
 
   update(time, delta) {
     const isGrounded = this.player.body.blocked.down
-
+  
     if (isGrounded) {
       this.lastGroundedTime = time
     }
-
+  
     if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
       this.lastJumpPressTime = time
     }
-
+  
     const withinCoyoteTime = time - this.lastGroundedTime < this.coyoteTime
     const withinJumpBuffer = time - this.lastJumpPressTime < this.jumpBufferTime
-
+  
     if (withinCoyoteTime && withinJumpBuffer) {
       this.player.setVelocityY(-350)
-      this.player.anims.play('jump', true)
+  
+      // 🔥 Only play jump animation if not shooting
+      if (!this.isShooting) {
+        this.player.anims.play('jump', true)
+      }
+  
       this.lastGroundedTime = 0
       this.lastJumpPressTime = 0
     }
-
+  
+    // ✅ Allow movement while shooting, but don't override the shoot animation
     if (this.cursors.left.isDown) {
       this.player.setVelocityX(-220)
-      this.player.anims.play('run', true)
+      if (!this.isShooting && this.player.body.blocked.down) {
+        this.player.anims.play('run', true)
+      }
       this.player.setFlipX(true)
     } else if (this.cursors.right.isDown) {
       this.player.setVelocityX(220)
-      this.player.anims.play('run', true)
+      if (!this.isShooting && this.player.body.blocked.down) {
+        this.player.anims.play('run', true)
+      }
       this.player.setFlipX(false)
     } else {
       this.player.setVelocityX(0)
-      this.player.anims.play('idle', true)
+      if (!this.isShooting && this.player.body.blocked.down) {
+        this.player.anims.play('idle', true)
+      }
     }
-  }
+  
+    if (Phaser.Input.Keyboard.JustDown(this.shootKey)) {
+      this.shootSpell()
+    }
+  }  
 }
