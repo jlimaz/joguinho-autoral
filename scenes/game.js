@@ -12,7 +12,8 @@ class GameScene extends Phaser.Scene {
     this.load.spritesheet('player', 'assets/playerSheet.png', { frameWidth: 900, frameHeight: 900 })
     this.load.spritesheet('skeleton', 'assets/skeleton.png', { frameWidth: 900, frameHeight: 900 })
     this.load.spritesheet('spell', 'assets/spell.png', { frameWidth: 1800, frameHeight: 1200 }) // Load spell
-    this.load.image('bgF', 'assets/backgroundIG.png')
+    this.load.image('backgroundIG', 'assets/backgroundIG.png');
+    this.load.image('background2', 'assets/backgroundMenu2.png');
     this.load.image('ground', 'assets/ground.png')
 
     this.load.image('menuButton', 'assets/menu.png')
@@ -27,7 +28,8 @@ class GameScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.fadeIn(225, 0, 0, 0)
-    this.add.image(widthGame / 2, heightGame / 2, 'bgF')
+    this.background2 = this.add.tileSprite(0, 0, widthGame, heightGame, 'background2').setOrigin(0, 0);
+    this.add.image(widthGame / 2, heightGame / 2, 'backgroundIG')
 
     this.add.image(widthGame - 75, 75, 'menuButton').setScale(0.35)
     // Add image with delay and fade in/out
@@ -254,5 +256,7 @@ class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.shootKey)) {
       this.shootSpell()
     }
+
+    this.background2.tilePositionX += 0.2
   }  
 }
