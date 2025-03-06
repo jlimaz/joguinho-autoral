@@ -7,6 +7,9 @@ class GameScene extends Phaser.Scene {
     this.lastGroundedTime = 0
     this.lastJumpPressTime = 0
 
+    this.maxHealth = 100  // 🔥 Maximum health
+    this.health = this.maxHealth // 🔥 Start at full health
+
     this.maxMana = 200 // 🔥 Maximum mana
     this.mana = this.maxMana // 🔥 Start at full mana
     this.manaRegenRate = 10 // 🔥 Mana regenerated per second
@@ -24,6 +27,8 @@ class GameScene extends Phaser.Scene {
     this.load.image('menuButton', 'assets/menu.png')
     this.load.image('firstWave', 'assets/firstWave.png')
     this.load.image('hudTopLeft', 'assets/hudTopLeft.png')
+    this.load.spritesheet('headSprite', 'assets/headSprite.png', { frameWidth: 500, frameHeight: 500 })
+
 
     let mistGfx = this.make.graphics({ x: 0, y: 0, add: false })
     mistGfx.fillStyle(0xffffff, 0.2)
@@ -33,11 +38,18 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
+    this.health = this.maxHealth // ✅ Reset health on restart
+    this.updateHealthBar()
+    
+    this.mana = this.maxMana // ✅ Reset mana on restart
+    this.updateManaBar()
+
     this.cameras.main.fadeIn(225, 0, 0, 0)
     this.background2 = this.add.tileSprite(0, 0, widthGame, heightGame, 'background2').setOrigin(0, 0);
     this.add.image(widthGame / 2, heightGame / 2, 'backgroundIG')
 
     this.add.image(310, 110, 'hudTopLeft').setScale(0.2)
+    this.headSprite = this.add.sprite(110, 110, 'headSprite').setScale(0.2)
 
     const menuButton = this.add.image(widthGame - 75, 75, 'menuButton').setScale(0.3)
 
@@ -81,6 +93,13 @@ class GameScene extends Phaser.Scene {
       loop: true
     })
 
+    // 🔥 Mana Regeneration System (Runs Every Second)
+    this.time.addEvent({
+      delay: 1000,
+      callback: this.regenerateHealth,
+      callbackScope: this,
+      loop: true
+    })
     
     
     // Add image with delay and fade in/out
@@ -121,6 +140,20 @@ class GameScene extends Phaser.Scene {
     this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A)
     this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
     this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
+
+    this.anims.create({
+      key: 'blink',
+      frames: this.anims.generateFrameNumbers('headSprite', { start: 0, end: 1 }),
+      frameRate: 2,
+      repeat: 0
+    })
+
+    this.anims.create({
+      key: 'idleHead',
+      frames: this.anims.generateFrameNumbers('headSprite', { start: 0, end: 0 }),
+      frameRate: 1,
+      repeat: 0
+    })
 
     this.anims.create({
       key: 'idle',
@@ -186,6 +219,19 @@ class GameScene extends Phaser.Scene {
       loop: true
     })
 
+    // blink hud
+    this.time.addEvent({
+      delay: 3500,
+      callback: () => {
+      this.headSprite.anims.play('blink', true);
+      this.headSprite.once('animationcomplete', () => {
+        this.headSprite.anims.play('idleHead', true);
+      });
+      },
+      callbackScope: this,
+      loop: true
+    })
+
     // 🔥 Spell group
     this.spells = this.physics.add.group()
 
@@ -194,16 +240,22 @@ class GameScene extends Phaser.Scene {
   }
 
   spawnEnemy() {
-    let spawnX = Phaser.Math.Between(50, widthGame - 50)
+    let spawnX
+    let safeDistance = 150
+  
+    do {
+      spawnX = Phaser.Math.Between(50, widthGame - 50)
+    } while (Math.abs(spawnX - this.player.x) < safeDistance) // 🔥 Ensure distance
+  
     let spawnY = heightGame - 165
-
     let enemy = this.enemies.create(spawnX, spawnY, 'skeleton').setScale(0.2)
     enemy.body.setSize(340, 600)
     enemy.setCollideWorldBounds(true)
     enemy.anims.play('skeleton_run', true)
-
+  
     this.setEnemyMovement(enemy)
   }
+  
 
   setEnemyMovement(enemy) {
     this.time.addEvent({
@@ -234,6 +286,11 @@ class GameScene extends Phaser.Scene {
   regenerateMana() {
     this.mana = Math.min(this.mana + this.manaRegenRate, this.maxMana)
     this.updateManaBar()
+  }
+
+  regenerateHealth() {
+    this.health = Math.min(this.health + 1, this.maxHealth)
+    this.updateHealthBar()
   }
 
   shootSpell() {
@@ -282,13 +339,38 @@ class GameScene extends Phaser.Scene {
       ease: 'Linear' // Smooth linear transition
     })
   }
+
+  updateHealthBar() {
+    let newWidth = (this.health / this.maxHealth) * 356
   
-  
+    this.tweens.add({
+      targets: this.healthBar,
+      width: Math.max(newWidth, 0), // Prevent negative width
+      duration: 250,
+      ease: 'Linear'
+    })
+  }
+
+  gameOver() {
+    console.log('💀 Game Over!')
+    this.scene.stop()
+    this.scene.start('MenuScene')
+  }  
 
   handlePlayerOverlap(player, enemy) {
-    console.log('⚠ Player touched an enemy!')
+    console.log('⚠ Player took damage!')
     enemy.destroy()
+  
+    this.health -= 20 // 🔥 Reduce health by 25
+    this.updateHealthBar()
+  
+    if (this.health <= 0) {
+      this.gameOver()
+    }
   }
+
+  
+  
 
   update(time, delta) {
     const isGrounded = this.player.body.blocked.down
