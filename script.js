@@ -14,7 +14,7 @@ const config = {
     }
   },
   // isso adiciona as cenas que serão usadas
-  scene: [GameScene],
+  scene: [MenuScene, GameScene, PauseScene],
 };
 
 // cria a instância do jogo

@@ -39,7 +39,33 @@ class GameScene extends Phaser.Scene {
 
     this.add.image(310, 110, 'hudTopLeft').setScale(0.2)
 
-    this.add.image(widthGame - 75, 75, 'menuButton').setScale(0.3)
+    const menuButton = this.add.image(widthGame - 75, 75, 'menuButton').setScale(0.3)
+
+    menuButton.setInteractive();
+    menuButton.on('pointerdown', () => {
+      this.scene.launch('PauseScene')
+      this.scene.pause();
+    });
+
+    menuButton.on('pointerover', () => {
+      this.tweens.add({
+        targets: menuButton,
+        scale: 0.33,
+        duration: 250,
+        ease: 'Power2'
+      });
+      menuButton.setTint(0xC0C0C0);
+    });
+
+    menuButton.on('pointerout', () => {
+      this.tweens.add({
+        targets: menuButton,
+        scale: 0.3,
+        duration: 250,
+        ease: 'Power2'
+      });
+      menuButton.clearTint();
+    });
 
     // 🔥 health bar
     this.healthBar = this.add.rectangle(388, 72.5, 356, 40, 0xD84040)
