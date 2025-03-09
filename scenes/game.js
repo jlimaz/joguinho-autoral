@@ -2,34 +2,44 @@ class GameScene extends Phaser.Scene {
   constructor() {
     super({ key: 'GameScene' })
 
-    this.coyoteTime = 100 // milliseconds
-    this.jumpBufferTime = 150 // milliseconds
-    this.lastGroundedTime = 0
-    this.lastJumpPressTime = 0
+    // Coyote time and jump buffer for smoother jumping mechanics
+    this.coyoteTime = 100 // Time after leaving the ground where you can still jump
+    this.jumpBufferTime = 150 // Time before landing where a jump input is still valid
+    this.lastGroundedTime = 0 // Tracks the last time the player was on the ground
+    this.lastJumpPressTime = 0 // Tracks the last time the jump key was pressed
 
-    this.maxHealth = 100  // 🔥 Maximum health
-    this.health = this.maxHealth // 🔥 Start at full health
+    // Player stats
+    this.maxHealth = 100
+    this.health = this.maxHealth
 
-    this.maxMana = 200 // 🔥 Maximum mana
-    this.mana = this.maxMana // 🔥 Start at full mana
-    this.manaRegenRate = 10 // 🔥 Mana regenerated per second
-    this.manaCost = 20 // 🔥 Mana cost per spell
+    this.maxMana = 200
+    this.mana = this.maxMana
+    this.manaRegenRate = 10 // Mana regenerated per second
+    this.manaCost = 20 // Mana cost to cast a spell
+
+    this.score = 0 // Player's score
   }
 
   preload() {
+    // Load all assets (spritesheets, images, etc.)
     this.load.spritesheet('player', 'assets/playerSheet.png', { frameWidth: 900, frameHeight: 900 })
     this.load.spritesheet('skeleton', 'assets/skeleton.png', { frameWidth: 900, frameHeight: 900 })
-    this.load.spritesheet('spell', 'assets/spell.png', { frameWidth: 1800, frameHeight: 1200 }) // Load spell
-    this.load.image('backgroundIG', 'assets/backgroundIG.png');
-    this.load.image('background2', 'assets/backgroundMenu2.png');
+    this.load.spritesheet('spell', 'assets/spell.png', { frameWidth: 1800, frameHeight: 1200 })
+    this.load.image('backgroundIG', 'assets/backgroundIG.png')
+    this.load.image('background2', 'assets/backgroundMenu2.png')
     this.load.image('ground', 'assets/ground.png')
+    this.load.image('skull', 'assets/skull.png')
 
+    // Load UI elements
     this.load.image('menuButton', 'assets/menu.png')
-    this.load.image('firstWave', 'assets/firstWave.png')
+    this.load.image('helpButton', 'assets/help.png')
+    this.load.image('infiniteMode', 'assets/infiniteMode.png')
+    this.load.image('moveWith', 'assets/moveWith.png')
+    this.load.image('castSpell', 'assets/castSpell.png')
     this.load.image('hudTopLeft', 'assets/hudTopLeft.png')
     this.load.spritesheet('headSprite', 'assets/headSprite.png', { frameWidth: 500, frameHeight: 500 })
 
-
+    // Create a mist particle effect
     let mistGfx = this.make.graphics({ x: 0, y: 0, add: false })
     mistGfx.fillStyle(0xffffff, 0.2)
     mistGfx.fillCircle(3, 3, 3)
@@ -38,36 +48,52 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
-    this.health = this.maxHealth // ✅ Reset health on restart
+    // Initialize player stats
+    this.health = this.maxHealth
     this.updateHealthBar()
-    
-    this.mana = this.maxMana // ✅ Reset mana on restart
+
+    this.mana = this.maxMana
     this.updateManaBar()
 
+    // Fade in the scene
     this.cameras.main.fadeIn(225, 0, 0, 0)
-    this.background2 = this.add.tileSprite(0, 0, widthGame, heightGame, 'background2').setOrigin(0, 0);
+
+    // Add background images
+    this.background2 = this.add.tileSprite(0, 0, widthGame, heightGame, 'background2').setOrigin(0, 0)
     this.add.image(widthGame / 2, heightGame / 2, 'backgroundIG')
 
+    // Add UI elements
     this.add.image(310, 110, 'hudTopLeft').setScale(0.2)
     this.headSprite = this.add.sprite(110, 110, 'headSprite').setScale(0.2)
 
     const menuButton = this.add.image(widthGame - 75, 75, 'menuButton').setScale(0.3)
+    const helpButton = this.add.image(widthGame - 150, 75, 'helpButton').setScale(0.3)
 
-    menuButton.setInteractive();
+    this.add.image(80, 260, 'skull').setScale(0.275)
+
+    // Make the menu button interactive
+    menuButton.setInteractive()
     menuButton.on('pointerdown', () => {
       this.scene.launch('PauseScene')
-      this.scene.pause();
-    });
+      this.scene.pause()
+    })
 
+    // Pause the game when ESC key is pressed
+    this.input.keyboard.on('keydown-ESC', () => {
+      this.scene.launch('PauseScene')
+      this.scene.pause()
+    })
+
+    // Add hover effects to the menu button
     menuButton.on('pointerover', () => {
       this.tweens.add({
         targets: menuButton,
         scale: 0.33,
         duration: 250,
         ease: 'Power2'
-      });
-      menuButton.setTint(0xC0C0C0);
-    });
+      })
+      menuButton.setTint(0xC0C0C0)
+    })
 
     menuButton.on('pointerout', () => {
       this.tweens.add({
@@ -75,17 +101,39 @@ class GameScene extends Phaser.Scene {
         scale: 0.3,
         duration: 250,
         ease: 'Power2'
-      });
-      menuButton.clearTint();
-    });
+      })
+      menuButton.clearTint()
+    })
 
-    // 🔥 health bar
+    // Make the help button interactive
+    helpButton.setInteractive()
+
+    // Add hover effects to the help button
+    helpButton.on('pointerover', () => {
+      this.tweens.add({
+        targets: helpButton,
+        scale: 0.33,
+        duration: 250,
+        ease: 'Power2'
+      })
+      helpButton.setTint(0xC0C0C0)
+    })
+
+    helpButton.on('pointerout', () => {
+      this.tweens.add({
+        targets: helpButton,
+        scale: 0.3,
+        duration: 250,
+        ease: 'Power2'
+      })
+      helpButton.clearTint()
+    })
+
+    // Create health and mana bars
     this.healthBar = this.add.rectangle(388, 72.5, 356, 40, 0xD84040)
-
-    // 🔥 mana bar
     this.manaBar = this.add.rectangle(388, 148.5, 356, 40, 0x578FCA)
 
-    // 🔥 Mana Regeneration System (Runs Every Second)
+    // Regenerate mana and health over time
     this.time.addEvent({
       delay: 1000,
       callback: this.regenerateMana,
@@ -93,37 +141,119 @@ class GameScene extends Phaser.Scene {
       loop: true
     })
 
-    // 🔥 Mana Regeneration System (Runs Every Second)
     this.time.addEvent({
       delay: 1000,
       callback: this.regenerateHealth,
       callbackScope: this,
       loop: true
     })
-    
-    
-    // Add image with delay and fade in/out
-    this.time.delayedCall(2000, () => {
-      let image = this.add.image(widthGame / 2, 75, 'firstWave').setAlpha(0);
-      this.tweens.add({
-      targets: image,
-      alpha: 1,
-      duration: 1000,
-      onComplete: () => {
-        this.time.delayedCall(3000, () => {
-        this.tweens.add({
-          targets: image,
-          alpha: 0,
-          duration: 1000,
-          onComplete: () => {
-          image.destroy();
-          }
-        });
-        });
-      }
-      });
-    });
 
+    // Show tutorial messages with fade-in and fade-out effects
+    this.time.delayedCall(2000, () => {
+      let image = this.add.image(widthGame / 2, 75, 'infiniteMode').setAlpha(0)
+      this.tweens.add({
+        targets: image,
+        alpha: 1,
+        duration: 1000,
+        onComplete: () => {
+          this.time.delayedCall(3000, () => {
+            this.tweens.add({
+              targets: image,
+              alpha: 0,
+              duration: 1000,
+              onComplete: () => {
+                image.destroy()
+              }
+            })
+          })
+        }
+      })
+    })
+
+    this.time.delayedCall(2000, () => {
+      let image = this.add.image(widthGame - 325, heightGame - 230, 'moveWith').setAlpha(0)
+      this.tweens.add({
+        targets: image,
+        alpha: 1,
+        duration: 1000,
+        onComplete: () => {
+          this.time.delayedCall(6000, () => {
+            this.tweens.add({
+              targets: image,
+              alpha: 0,
+              duration: 1000,
+              onComplete: () => {
+                image.destroy()
+              }
+            })
+          })
+        }
+      })
+    })
+    
+    this.time.delayedCall(2000, () => {
+      let image = this.add.image(widthGame - 325, heightGame - 150, 'castSpell').setAlpha(0)
+      this.tweens.add({
+        targets: image,
+        alpha: 1,
+        duration: 1000,
+        onComplete: () => {
+          this.time.delayedCall(6000, () => {
+            this.tweens.add({
+              targets: image,
+              alpha: 0,
+              duration: 1000,
+              onComplete: () => {
+                image.destroy()
+              }
+            })
+          })
+        }
+      })
+    })
+
+    // Help button interaction
+    helpButton.on('pointerdown', () => {
+      let moveWithImage = this.add.image(widthGame - 325, heightGame - 230, 'moveWith').setAlpha(0)
+      this.tweens.add({
+        targets: moveWithImage,
+        alpha: 1,
+        duration: 1000,
+        onComplete: () => {
+          this.time.delayedCall(6000, () => {
+            this.tweens.add({
+              targets: moveWithImage,
+              alpha: 0,
+              duration: 1000,
+              onComplete: () => {
+                moveWithImage.destroy()
+              }
+            })
+          })
+        }
+      })
+    
+      let castSpellImage = this.add.image(widthGame - 325, heightGame - 150, 'castSpell').setAlpha(0)
+      this.tweens.add({
+        targets: castSpellImage,
+        alpha: 1,
+        duration: 1000,
+        onComplete: () => {
+          this.time.delayedCall(6000, () => {
+            this.tweens.add({
+              targets: castSpellImage,
+              alpha: 0,
+              duration: 1000,
+              onComplete: () => {
+                castSpellImage.destroy()
+              }
+            })
+          })
+        }
+      })
+    })
+
+    // Add player and ground physics
     this.player = this.physics.add.sprite(100, heightGame - 200, 'player').setScale(0.2)
     this.player.body.setSize(340, 600)
     this.player.setCollideWorldBounds(true)
@@ -133,14 +263,23 @@ class GameScene extends Phaser.Scene {
     groundTile.refreshBody()
 
     this.physics.add.collider(this.player, this.ground)
-    this.cursors = this.input.keyboard.createCursorKeys()
-    this.shootKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K) // Add shoot key
 
-    // Add A and D keys
+    // Set up keyboard input
+    this.cursors = this.input.keyboard.createCursorKeys()
+    this.shootKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K)
+
     this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A)
     this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
     this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
 
+    // Display the score
+    this.scoreText = this.add.text(160, 260, '0', {
+      fontSize: '48px',
+      fill: '#fff',
+      fontFamily: 'Jersey25'
+    }).setOrigin(0.5, 0.5)
+
+    // Create animations for the player, enemies, and spells
     this.anims.create({
       key: 'blink',
       frames: this.anims.generateFrameNumbers('headSprite', { start: 0, end: 1 }),
@@ -192,11 +331,12 @@ class GameScene extends Phaser.Scene {
 
     this.anims.create({
       key: 'spell_fly',
-      frames: this.anims.generateFrameNumbers('spell', { start: 0, end: 3 }), // Assuming 4 frames for the spell
+      frames: this.anims.generateFrameNumbers('spell', { start: 0, end: 3 }),
       frameRate: 10,
       repeat: -1
     })
 
+    // Add mist particles for atmosphere
     this.mistParticles = this.add.particles(0, 0, 'mistParticle', {
       x: { min: 0, max: widthGame },
       y: { min: 0, max: heightGame - 110 },
@@ -208,10 +348,12 @@ class GameScene extends Phaser.Scene {
       blendMode: 'ADD'
     })
 
+    // Create enemy group and set up collisions
     this.enemies = this.physics.add.group()
     this.physics.add.collider(this.enemies, this.ground)
     this.physics.add.overlap(this.player, this.enemies, this.handlePlayerOverlap, null, this)
 
+    // Spawn enemies periodically
     this.time.addEvent({
       delay: 2000,
       callback: this.spawnEnemy,
@@ -219,44 +361,43 @@ class GameScene extends Phaser.Scene {
       loop: true
     })
 
-    // blink hud
+    // Make the head sprite blink periodically
     this.time.addEvent({
       delay: 3500,
       callback: () => {
-      this.headSprite.anims.play('blink', true);
-      this.headSprite.once('animationcomplete', () => {
-        this.headSprite.anims.play('idleHead', true);
-      });
+        this.headSprite.anims.play('blink', true)
+        this.headSprite.once('animationcomplete', () => {
+          this.headSprite.anims.play('idleHead', true)
+        })
       },
       callbackScope: this,
       loop: true
     })
 
-    // 🔥 Spell group
+    // Create spell group and set up overlaps
     this.spells = this.physics.add.group()
-
-    // Collision: Spell hits enemy
     this.physics.add.overlap(this.spells, this.enemies, this.spellHitEnemy, null, this)
   }
 
+  // Spawn an enemy at a safe distance from the player
   spawnEnemy() {
     let spawnX
     let safeDistance = 150
-  
+
     do {
       spawnX = Phaser.Math.Between(50, widthGame - 50)
-    } while (Math.abs(spawnX - this.player.x) < safeDistance) // 🔥 Ensure distance
-  
+    } while (Math.abs(spawnX - this.player.x) < safeDistance)
+
     let spawnY = heightGame - 165
     let enemy = this.enemies.create(spawnX, spawnY, 'skeleton').setScale(0.2)
     enemy.body.setSize(340, 600)
     enemy.setCollideWorldBounds(true)
     enemy.anims.play('skeleton_run', true)
-  
+
     this.setEnemyMovement(enemy)
   }
-  
 
+  // Make the enemy move towards the player
   setEnemyMovement(enemy) {
     this.time.addEvent({
       delay: 100,
@@ -278,126 +419,132 @@ class GameScene extends Phaser.Scene {
     })
   }
 
+  // Handle spell hitting an enemy
   spellHitEnemy(spell, enemy) {
     spell.destroy()
     enemy.destroy()
+    this.score++
+    this.updateScoreText()
   }
 
+  // Update the score display
+  updateScoreText() {
+    this.scoreText.setText(this.score)
+  }
+
+  // Regenerate mana over time
   regenerateMana() {
     this.mana = Math.min(this.mana + this.manaRegenRate, this.maxMana)
     this.updateManaBar()
   }
 
+  // Regenerate health over time
   regenerateHealth() {
     this.health = Math.min(this.health + 1, this.maxHealth)
     this.updateHealthBar()
   }
 
+  // Shoot a spell if the player has enough mana
   shootSpell() {
-
     if (this.mana < this.manaCost) {
-      console.log('Not enough mana!')
+      console.log('not enough mana!')
       return
     }
 
     let spell = this.spells.create(this.player.x, this.player.y - 10, 'spell').setScale(0.10)
-    
     spell.anims.play('spell_fly', true)
 
-    this.mana -= this.manaCost // 🔥 Deduct Mana
-    this.updateManaBar() // 🔥 Update the mana bar
-  
+    this.mana -= this.manaCost
+    this.updateManaBar()
+
     let direction = this.player.flipX ? -1 : 1
     spell.body.setSize(815, 415)
     spell.setVelocityX(400 * direction)
     spell.setFlipX(this.player.flipX)
-    
-    spell.body.allowGravity = false // ✅ Disable gravity so it moves straight
-    
-    // Destroy spell after leaving screen
+    spell.body.allowGravity = false
+
+    // Destroy the spell after 2 seconds
     this.time.delayedCall(2000, () => spell.destroy())
-  
-    // 🔥 Play shoot animation **without stopping movement**
+
     this.player.anims.play('shoot', true)
-  
-    // ✅ Set a flag so update() knows the shoot animation is playing
-    this.isShooting = true 
-  
-    // ⏳ Once the animation ends, reset the flag
+    this.isShooting = true
+
     this.player.once('animationcomplete-shoot', () => {
       this.isShooting = false
     })
   }
 
+  // Update the mana bar display
   updateManaBar() {
     let newWidth = (this.mana / this.maxMana) * 356
-  
+
     this.tweens.add({
       targets: this.manaBar,
-      width: Math.max(newWidth, 0), // Prevent negative width
-      duration: 250, 
-      ease: 'Linear' // Smooth linear transition
-    })
-  }
-
-  updateHealthBar() {
-    let newWidth = (this.health / this.maxHealth) * 356
-  
-    this.tweens.add({
-      targets: this.healthBar,
-      width: Math.max(newWidth, 0), // Prevent negative width
+      width: Math.max(newWidth, 0),
       duration: 250,
       ease: 'Linear'
     })
   }
 
-  gameOver() {
-    console.log('💀 Game Over!')
-    this.scene.stop()
-    this.scene.start('MenuScene')
-  }  
+  // Update the health bar display
+  updateHealthBar() {
+    let newWidth = (this.health / this.maxHealth) * 356
 
+    this.tweens.add({
+      targets: this.healthBar,
+      width: Math.max(newWidth, 0),
+      duration: 250,
+      ease: 'Linear'
+    })
+  }
+
+  // Handle game over
+  gameOver() {
+    this.scene.stop()
+    this.scene.start('OverScene')
+  }
+
+  // Handle player taking damage from an enemy
   handlePlayerOverlap(player, enemy) {
     console.log('⚠ Player took damage!')
     enemy.destroy()
-  
-    this.health -= 20 // 🔥 Reduce health by 25
+
+    this.health -= 20
     this.updateHealthBar()
-  
+
     if (this.health <= 0) {
       this.gameOver()
     }
   }
 
-  
-  
-
+  // Update the game state every frame
   update(time, delta) {
     const isGrounded = this.player.body.blocked.down
-  
+
     if (isGrounded) {
       this.lastGroundedTime = time
     }
-  
+
     if (Phaser.Input.Keyboard.JustDown(this.keySpace)) {
       this.lastJumpPressTime = time
     }
+
+    // Check if the player is within coyote time and jump buffer
     const withinCoyoteTime = time - this.lastGroundedTime < this.coyoteTime
     const withinJumpBuffer = time - this.lastJumpPressTime < this.jumpBufferTime
-  
+
     if (withinCoyoteTime && withinJumpBuffer) {
       this.player.setVelocityY(-350)
-  
-      // 🔥 Only play jump animation if not shooting
+
       if (!this.isShooting) {
         this.player.anims.play('jump', true)
       }
-  
+
       this.lastGroundedTime = 0
       this.lastJumpPressTime = 0
     }
-  
-    // ✅ Allow movement while shooting, but don't override the shoot animation
+
+    // Handle player movement
     if (this.keyA.isDown) {
       this.player.setVelocityX(-220)
       if (!this.isShooting && this.player.body.blocked.down) {
@@ -416,11 +563,13 @@ class GameScene extends Phaser.Scene {
         this.player.anims.play('idle', true)
       }
     }
-  
+
+    // Shoot a spell when the shoot key is pressed
     if (Phaser.Input.Keyboard.JustDown(this.shootKey)) {
       this.shootSpell()
     }
 
+    // Scroll the background
     this.background2.tilePositionX += 0.2
-  }  
+  }
 }
